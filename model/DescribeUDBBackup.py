@@ -19,6 +19,11 @@ class DescribeUDBBackup(object):
         params = (is_download,)
         return self.__sqlhelper.get_one_data(sql,params)
 
+    def get_all_download_id(self,is_download):
+        sql = "select * from DescribeUDBBackup where is_download = %s"
+        params = (is_download,)
+        return self.__sqlhelper.get_all_data(sql,params)
+
     def get_all(self):
         sql = "select * from DescribeUDBBackup"
         params = ()

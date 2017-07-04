@@ -57,7 +57,7 @@ class server_conn(object):
 
 
     def request_url(self):
-        print self.url
+        logging.info( self.url)
         req = urllib2.urlopen(self.url)
         result = req.read()
         return result
@@ -68,7 +68,7 @@ class server_conn(object):
 
         else:
             url_str = "http://%s%s" %(self.host,url)
-        print url_str
+        logging.info( url_str)
         req = urllib2.urlopen(url_str)
         result = req.read()
         return result
@@ -80,14 +80,15 @@ class server_conn(object):
 class http_method(object):
 
     def __init__(self):
+        pass
 
-        self.message = message
+        # self.message = message
 
 
     def inform_post(self,mess_infom):
         # post的组接口
         # url = 'https://oapi.dingtalk.com/robot/send?access_token=6e7583cdcb89f266026a21723e52aedd63dd21e8aa2e2c061b35e734759cf920'
-        url = 'https://oapi.dingtalk.com/robot/send?access_token=466422beff8414177cf8c56f14b19f5ce64eba073f633bc339e4634a617e7b67'
+        url = 'https://oapi.dingtalk.com/robot/send?access_token=51f2b40d112daaaf3d972395c3afde7e8b60c3b8a00b9121b66883ceb1db341c'
         # payload = {'some': 'data'}
         headers = {'content-type': 'application/json'}
 
@@ -174,15 +175,20 @@ def get_download_url(public_key,private_key):
 
     # logging.info(type(download_list[0]))
     # logging.info(download_list)
-    #多线程下载
+    # 多线程下载
     if len(download_list) == 0:
         logging.info("没有可下载的备份文件")
 
     else:
+        '''
         print download_list
         print len(download_list)
+        # 3、实现多进程同时下载所有的备份文件
+        '''
+        pool = Pool(processes=len(download_list))
+        # i 代表list index,item内容
+        for i, item in enumerate(download_list):
 
-        for item in download_list:
             '''
             print type(item)
             print item
@@ -195,14 +201,18 @@ def get_download_url(public_key,private_key):
 
             '''
 
-            print 'Parent process %s.' % os.getpid()
+            logging.info( 'Parent process %s.' % os.getpid())
 
             # 看cpu的核数，一般是cpu的2倍，过多会产生僵尸进程，父进程和子进程失联,父进程会变为1.
-            pool = Pool(processes=2)
 
+            pool.apply_async(many_process_download,[item["BackupPath"],item["BackupId"], i])
             res_list = []
-            for i in range(2):
-                pool.apply_async(many_process_download,[item["BackupPath"],item["BackupId"],i])
+            '''
+            # 2、 把创建进程放在循环里面发现创建了2个进程去下载同一个地址，最后后完成下载的进程覆盖掉新下载好的文件，相当于2个进程去下载同一个文件，最后只能看到一个文件，
+            #     启用了2个进程去下载同一个地址，后面会覆盖前面进程下载好的，下载完一个在下载下一个也是开2个进程去下载同一个下载地址
+            # pool = Pool(processes=2)
+            # for i in range(2):
+                # pool.apply_async(many_process_download,[item["BackupPath"],item["BackupId"], i])
                 # pool.apply_async(many_process_download,[json.loads(item)["BackupPath"],backupid,i])
                 # res = pool.apply_async(get_download_url,[public_key,private_key,i]) # 这里使用 pool.apply 可以串行输出，也就是阻塞，等待进程输出
                 # res = Process(target=f,args=[,i])
@@ -210,12 +220,11 @@ def get_download_url(public_key,private_key):
                 # print '-----:', i
                 # res_list.append(res)
                 # print res_list
-            print 'Waiting for all subprocesses done...'
-            pool.close()
-            pool.join()
+            '''
+            logging.info( 'Waiting for all subprocesses done...')
 
-            print 'All subprocesses done.'
 
+            '''
             # for r in res_list:
             #     try:
             #         # 设置进程挂死的超时时间，防止如果进程挂起，永远get不到数据时就会抛出异常！设置每个进程的超时时间
@@ -223,19 +232,24 @@ def get_download_url(public_key,private_key):
             #     # except Exception as e:
             #     except TimeoutError:
             #         print "We lacked patience and got a multiprocessing.TimeoutError"
+            '''
+        pool.close()
+        pool.join()
+        logging.info( 'All subprocesses done.')
+        # return True
+        # return download_list
 
-    # return download_list
 
 
 def many_process_download(download_url,backupid,name):
 
     sql = DescribeUDBBackup.DescribeUDBBackup()
 
-    print 'Run task %s (%s)...' % (name, os.getpid())
+    logging.info( 'Run task %s (%s)...' % (name, os.getpid()))
     start = time.time()
     # time.sleep(random.random() * 3)
     url_download_staus = commands.getstatusoutput('wget -c -P /data/dbbackup %s &> /tmp/db_download.log'  % (download_url, ))
-    print url_download_staus
+    logging.info( url_download_staus)
     # url_download_staus = commands.getstatusoutput('wget -c -P /data/dbbackup %s &> /tmp/db_download.log'  % (str(json.loads(item)["BackupPath"]),) )
     # url_download_staus = commands.getstatusoutput('wget -c -P /data/dbbackup %s &> /tmp/db_download.log')  % (item["BackupPath"])
     if url_download_staus[0] == 0:
@@ -250,7 +264,7 @@ def many_process_download(download_url,backupid,name):
         logging.info( "download url failed: %s, Next time automatically download" % (download_url))
 
     end = time.time()
-    print 'Many process Task %s runs %0.2f seconds.' % (name, (end - start))
+    logging.info( 'Many process Task %s runs %0.2f seconds.' % (name, (end - start)))
 
 
 
@@ -291,13 +305,63 @@ def bakparams_write_db(public_key,private_key,params):
 
 
 
+def infor_dd():
+
+    sql = DescribeUDBBackup.DescribeUDBBackup()
+
+    dd_infor = http_method()
+
+    is_download = 1
+
+    download_success_url = []
+
+    for url in sql.get_all_download_id(is_download):
+        # print type(url)
+        download_success_url.append(url)
+
+    with open('/tmp/db.dd', 'ab+') as write_file_dd:
+        write_file_dd.write("Ucloud广州B区db全备:\n\n数据库实例名称            备份时间            备份大小\n")
+
+    logging.info( download_success_url)
+
+    for item in download_success_url:
+        with open('/tmp/db.dd', 'ab+') as write_file_dd:
+            try:
+                value = round(float(item[4])/1024/1024,4)
+                line =  "\n%s       %s       %sM\n" %(item[8],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(item[3])),value)
+            except Exception as e:
+                logging.info(e)
+            write_file_dd.write(line)
+
+    with open('/tmp/db.dd', 'ab+') as write_file_dd:
+        write_file_dd.seek(0)
+        message_dd = write_file_dd.read()
+        # message_dd.encode('utf-8')
+
+    if len(download_success_url) > 0:
+        values = { "msgtype": "text","text": {"content": message_dd}, "at": {"atMobiles": ["18607169123","13986238346","18627051621"], } }
+        dd_infor.inform_post(values)
+
+    else:
+        logging.info("db中等于0的url为:%s" % download_success_url)
+
+    with open('/tmp/db.dd', 'w+') as write_file_dd:
+        clear_file_dd = ''
+        write_file_dd.write(clear_file_dd)
+
+    # print "Sleep 14400s..."
+    # time.sleep(14400)
+
+
 if __name__=='__main__':
     logging.basicConfig(filename='db_script.log',level=logging.DEBUG)
     bakparams_write_db(public_key,private_key,params)
     get_download_url(public_key,private_key)
+    infor_dd()
 
 
     '''
+    1、在这里使用多进程发现多个进程去下载不同的文件，但是文件内容是一样的，每次访问url的下载地址都会变，启动2个进程去下载同一个url返回的不同下载地址，其实下载的备份文件是同一个文件
     #这里使用多进程调用上面的get_download_url函数会出现多个进程下载一个文件的情况，也就是无法实现多进程同时下载多个备份文件的需求，只是把一个文件使用多进程去下载了多次而已，并不能实现需求
     print 'Parent process %s.' % os.getpid()
 
