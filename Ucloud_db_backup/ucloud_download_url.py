@@ -340,6 +340,7 @@ def infor_dd():
                 logging.info(e)
             write_file_dd.write(line)
     '''
+    
     dd_infor = http_method()
 
     with open('/tmp/db.dd', 'ab+') as write_file_dd:
