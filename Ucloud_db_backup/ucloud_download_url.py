@@ -185,6 +185,9 @@ def get_download_url(public_key,private_key):
         print len(download_list)
         # 3、实现多进程同时下载所有的备份文件
         '''
+        with open('/tmp/db.dd', 'ab+') as write_file_dd:
+            write_file_dd.write("Ucloud广州B区db全备:\n\n数据库实例名称            备份时间            备份大小        下载成功url\n")
+
         pool = Pool(processes=len(download_list))
         # i 代表list index,item内容
         for i, item in enumerate(download_list):
@@ -220,11 +223,8 @@ def get_download_url(public_key,private_key):
                 # print '-----:', i
                 # res_list.append(res)
                 # print res_list
-            '''
-            logging.info( 'Waiting for all subprocesses done...')
 
 
-            '''
             # for r in res_list:
             #     try:
             #         # 设置进程挂死的超时时间，防止如果进程挂起，永远get不到数据时就会抛出异常！设置每个进程的超时时间
@@ -233,9 +233,11 @@ def get_download_url(public_key,private_key):
             #     except TimeoutError:
             #         print "We lacked patience and got a multiprocessing.TimeoutError"
             '''
+        logging.info( 'Waiting for all subprocesses done...')
         pool.close()
         pool.join()
         logging.info( 'All subprocesses done.')
+        infor_dd()
         # return True
         # return download_list
 
@@ -253,7 +255,16 @@ def many_process_download(download_url,backupid,name):
     # url_download_staus = commands.getstatusoutput('wget -c -P /data/dbbackup %s &> /tmp/db_download.log'  % (str(json.loads(item)["BackupPath"]),) )
     # url_download_staus = commands.getstatusoutput('wget -c -P /data/dbbackup %s &> /tmp/db_download.log')  % (item["BackupPath"])
     if url_download_staus[0] == 0:
-        logging.info( "%s:download url success:  %s" % (time.time(),download_url))
+        logging.info( "%s:download url success:  %s" % (time.strftime('%Y-%m-%d %H:%M:%S'),download_url))
+        download_id = sql.get_one(backupid)
+        with open('/tmp/db.dd', 'ab+') as write_file_dd:
+            try:
+                value = round(float(download_id[4])/1024/1024,4)
+                line =  "\n%s       %s       %sM        %s\n" %(download_id[8],time.strftime('%Y-%m-%d %H:%M:%S',time.localtime(download_id[3])),value,download_url)
+            except Exception as e:
+                logging.info(e)
+            write_file_dd.write(line)
+
         # 将db中is_download修改为1,下次不再下载
         try:
             sql.update_one(backupid)
@@ -307,9 +318,8 @@ def bakparams_write_db(public_key,private_key,params):
 
 def infor_dd():
 
+    '''
     sql = DescribeUDBBackup.DescribeUDBBackup()
-
-    dd_infor = http_method()
 
     is_download = 1
 
@@ -318,9 +328,6 @@ def infor_dd():
     for url in sql.get_all_download_id(is_download):
         # print type(url)
         download_success_url.append(url)
-
-    with open('/tmp/db.dd', 'ab+') as write_file_dd:
-        write_file_dd.write("Ucloud广州B区db全备:\n\n数据库实例名称            备份时间            备份大小\n")
 
     logging.info( download_success_url)
 
@@ -332,18 +339,20 @@ def infor_dd():
             except Exception as e:
                 logging.info(e)
             write_file_dd.write(line)
+    '''
+    dd_infor = http_method()
 
     with open('/tmp/db.dd', 'ab+') as write_file_dd:
         write_file_dd.seek(0)
         message_dd = write_file_dd.read()
         # message_dd.encode('utf-8')
 
-    if len(download_success_url) > 0:
-        values = { "msgtype": "text","text": {"content": message_dd}, "at": {"atMobiles": ["18607169123","13986238346","18627051621"], } }
-        dd_infor.inform_post(values)
+        if len(message_dd) > 0:
+            values = { "msgtype": "text","text": {"content": message_dd}, "at": {"atMobiles": ["18607169123","13986238346","18627051621"], } }
+            dd_infor.inform_post(values)
 
-    else:
-        logging.info("db中等于0的url为:%s" % download_success_url)
+        else:
+            logging.info("已下载的url等于0:%s" % message_dd)
 
     with open('/tmp/db.dd', 'w+') as write_file_dd:
         clear_file_dd = ''
@@ -357,7 +366,7 @@ if __name__=='__main__':
     logging.basicConfig(filename='db_script.log',level=logging.DEBUG)
     bakparams_write_db(public_key,private_key,params)
     get_download_url(public_key,private_key)
-    infor_dd()
+
 
 
     '''
